@@ -174,9 +174,8 @@ def getContent():
 
         results.append(blog)
     df = df.append(results)
-    df.to_excel('C:/Users/Administrator/Desktop/微博抓取/爬微博1/results/results1018.xlsx',index=0)
+    df.to_excel('C:/Users/Administrator/Desktop/results.xlsx',index=0)
     logger.info('已导出微博条数：%s' % len(df))
-    # df.to_csv('C:/Users/Administrator/Desktop/results/results0806.csv',index=0,encoding='utf_8_sig')
 
 if __name__ == '__main__':
     logger = logging.getLogger(__name__)
@@ -191,10 +190,10 @@ if __name__ == '__main__':
     logger.addHandler(handler)
     logger.addHandler(console)
     logger.info('*'*30+'START'+'*'*30)
-    username = 'yinzhiren_ruc@163.com'
-    password = 'w}gRCLF(];DB'
+    username = '******' # 填写用户名
+    password = '******' # 填写密码
     LoginWeibo(username, password)
-    key = '尚德机构'
+    key = 'python' # 填写搜索关键词
     GetSearchContent(key)
     time.sleep(10)
     driver.quit()
