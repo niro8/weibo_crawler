@@ -9,15 +9,11 @@ import random
 import logging
 from selenium import webdriver
 
-#chrome_options = webdriver.ChromeOptions()
-#chrome_options.add_argument('headless')
-
-#driver = webdriver.Chrome('D:/chromedriver/chromedriver.exe',chrome_options=chrome_options)
 driver = webdriver.Chrome('D:/chromedriver/chromedriver.exe')
-#driver = webdriver.PhantomJS('D:/phantomjs/bin/phantomjs.exe')
 df = pandas.DataFrame()
 driver.maximize_window()
 
+# 登录
 def LoginWeibo(username, password):
     try:
         driver.get('http://www.weibo.com/login.php')
@@ -32,6 +28,7 @@ def LoginWeibo(username, password):
     except Exception:
         logger.error('Something wrong with', exc_info=True)
 
+# 搜索，如果大于一天，分天搜索
 def GetSearchContent(key):
     driver.get("http://s.weibo.com/")
     logger.info('搜索热点主题：%s' % key)
@@ -52,6 +49,7 @@ def GetSearchContent(key):
         start_stamp = end_stamp + datetime.timedelta(hours=1)
         end_stamp = start_stamp + delta_date
 
+# 处理页面，检查是否有内容，有内容进行爬取
 def handlePage():
     page = 1
     while True:
@@ -69,6 +67,7 @@ def handlePage():
             logger.info("no Content")
             break
 
+# 检查页面是否有内容
 def checkContent():
     try:
         driver.find_element_by_xpath("//div[@class='pl_noresult']")
@@ -77,6 +76,7 @@ def checkContent():
         flag = True
     return flag
 
+# 检查是否有下一页
 def checkNext():
     try:
         driver.find_element_by_xpath('//div[@class="m-page"]/div/a[@class="next"]')
@@ -85,6 +85,7 @@ def checkNext():
         flag = False
     return flag
 
+# 处理时间
 def get_datetime(s):
     try:
         today = datetime.datetime.today()
@@ -101,6 +102,7 @@ def get_datetime(s):
         date = s
     return date
 
+# 获取内容
 def getContent():
     nodes = driver.find_elements_by_xpath('//div[@class="card-wrap"][@action-type="feed_list_item"][@mid]')
     if len(nodes) == 0:

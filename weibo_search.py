@@ -15,6 +15,7 @@ import time
 import logging
 from bs4 import BeautifulSoup
 
+# 登录类
 class LoginSina(object):
 
     def __init__(self, username, password):
@@ -85,56 +86,68 @@ class DownloadWeibo(object):
     def get_keyword(self):
         return urllib.parse.quote(urllib.parse.quote(self.keywords))
 
+    # 拼接链接
     def get_url(self):
-        url = 'http://s.weibo.com/weibo/'+self.get_keyword()+'&typeall=1&suball=1&timescope=custom:'+self.startTime+':'+self.endTime+'&nodup=1&page='
+        search_str = self.get_keyword()+'?q='+urllib.parse.quote(self.keywords)
+        url = 'http://s.weibo.com/weibo/'+search_str+'&typeall=1&suball=1&timescope=custom:'+self.startTime+':'+self.endTime+'&page='
         return url
 
+    # 获取界面
     def get_html(self, pageNum):
         url = self.get_url()+str(pageNum)
         res = requests.get(url, cookies=self.cookies)
-        for line in res.text.splitlines():
-            if line.startswith('<script>STK && STK.pageletM && STK.pageletM.view({"pid":"pl_weibo_direct"'):
-                n = line.find('html":"')
-                outData = line[n + 7 : -12]
-        return outData.encode('utf-8').decode('unicode_escape').replace('\\','').replace('\u200b','').encode('utf-8','ignore').decode()
+        return res.text.replace('\u200b','')
 
+    # 处理时间
     def get_datetime(self, s):
         try:
-            m, d, H, M = re.findall(r'\d+',s)
-            date = datetime.datetime(2018, int(m), int(d), int(H), int(M)).strftime('%Y-%m-%d %H:%M')
+            today = datetime.datetime.today()
+            if '今天' in s:
+                H, M = re.findall(r'\d+',s)
+                date = datetime.datetime(today.year, today.month, today.day, int(H), int(M)).strftime('%Y-%m-%d %H:%M')
+            elif '年' in s:
+                y, m, d, H, M = re.findall(r'\d+',s)
+                date = datetime.datetime(int(y), int(m), int(d), int(H), int(M)).strftime('%Y-%m-%d %H:%M')                       
+            else:    
+                m, d, H, M = re.findall(r'\d+',s)
+                date = datetime.datetime(today.year, int(m), int(d), int(H), int(M)).strftime('%Y-%m-%d %H:%M')
         except:
             date = s
         return date
 
+    # 获取内容
     def get_results(self, html):
         results = []
         soup = BeautifulSoup(html, 'html.parser')
-        logger.info('微博数量：%s' % len(soup.select('.WB_cardwrap.S_bg2.clearfix')))
-        for i in soup.select('.WB_cardwrap.S_bg2.clearfix'):
+        logger.info('微博数量：%s' % len(soup.select('div[action-type="feed_list_item"]')))
+        for i in soup.select('div[action-type="feed_list_item"]'):
             blog = {}
-            blog['博主昵称'] = i.select('.name_txt')[0].get('nick-name')
-            blog['博主主页'] = 'https:'+i.select('.name_txt')[0].get('href')
+            blog['博主昵称'] = i.select('.name')[0].get('nick-name')
+            blog['博主主页'] = 'https:'+i.select('.name')[0].get('href')
             if len(i.select('.comment_txt'))>1:
-                blog['微博内容'] = i.select('.comment_txt')[0].get_text().strip()+'\n转发：'+i.select('.comment_txt')[1].get_text().strip()
-            else:
-                blog['微博内容'] = i.select('.comment_txt')[0].get_text().strip()
-            blog['发布时间'] = self.get_datetime(i.select('.feed_from.W_textb')[-1].select('a[date]')[0].get_text())
-            blog['微博地址'] = 'https:'+i.select('.feed_from.W_textb')[-1].select('a')[0].get('href')
+                # blog['微博内容'] = i.select('.comment_txt')[0].get_text().strip()+'\n转发：'+i.select('.comment_txt')[1].get_text().strip()
+                blog['微博内容'] = i.select('p.txt')[0].get_text().strip()
+            blog['发布时间'] = self.get_datetime(i.select('div[class="content"] p[class="from"] a')[0].get_text())
+            blog['微博地址'] = 'https:'+i.select('div[class="content"] p[class="from"] a')[0].get('href')
             try:
-                blog['微博来源'] = i.select('.feed_from.W_textb')[-1].select('a')[1].get_text()
+                blog['微博来源'] = i.select('div[class="content"] p[class="from"] a')[1].get_text()
             except:
                 blog['微博来源'] = ''
-            sd = i.select('.feed_action_info.feed_action_row4')[0]
             try:
-                blog['转发'] = 0 if sd.select('a[action-type="feed_list_forward"] em')[0].get_text()=='' else int(sd.select('a[action-type="feed_list_forward"] em')[0].get_text())
+                sd = i.select('.card-act ul li')
+            except Exception:
+                logger.info('sd not found...')
+                logger.error('Something wrong with', exc_info=True)
+            try:
+                blog['转发'] = 0 if sd[1].text.replace('转发','').strip()=='' else int(sd[1].text.replace('转发','').strip())
             except:
                 blog['转发'] = 0
             try:
-                blog['评论'] = 0 if sd.select('a[action-type="feed_list_comment"] em')[0].get_text()=='' else int(sd.select('a[action-type="feed_list_comment"] em')[0].get_text())
+                blog['评论'] = 0 if sd[2].text.replace('评论','').strip()=='' else int(sd[2].text.replace('评论','').strip())
             except:
                 blog['评论'] = 0
             try:
-                blog['赞'] = 0 if sd.select('a[action-type="feed_list_like"] em')[0].get_text()=='' else int(sd.select('a[action-type="feed_list_like"] em')[0].get_text())
+                blog['赞'] = 0 if sd[3].select('em')[0].get_text()=='' else int(sd[3].select('em')[0].get_text())
             except:
                 blog['赞'] = 0
             results.append(blog)
@@ -142,13 +155,11 @@ class DownloadWeibo(object):
 
     def get_totalpage(self):
         soup = BeautifulSoup(self.get_html(1), 'html.parser')
-        if len(soup.select('.noresult_tit'))>0:
+        self.count = int(re.search(r'\d+',soup.select('.result')[0].text).group(0))
+        if len(soup.select('.card-no-result'))>0:
             totalpage = 0
         else:
-            if len(soup.select('.layer_menu_list.W_scroll li'))==0:
-                totalpage = 1
-            else:
-                totalpage = len(soup.select('.layer_menu_list.W_scroll li'))
+            totalpage = len(soup.select('.s-scroll li'))
         return totalpage
 
     def get_contents(self):
@@ -164,7 +175,7 @@ class DownloadWeibo(object):
                     html_page = self.get_html(i)
                     results = self.get_results(html_page)
                     self.df = self.df.append(results)
-                except Exception as e:
+                except:
                     logger.error('Something wrong with', exc_info=True)
                     time.sleep(120)
                     logger.info('第%s页' % i)
@@ -172,23 +183,14 @@ class DownloadWeibo(object):
                     html_page = self.get_html(i)
                     results = self.get_results(html_page)
                     self.df = self.df.append(results)
-        csv_path = self.saveDir+self.keywords+self.startTime+'.csv'
-        excel_path = self.saveDir+self.keywords+self.startTime+'.xlsx'
-        try:
-            self.df.to_csv(csv_path, index=0, mode='a', encoding='utf_8_sig')
-            self.df.to_excel(excel_path, index=0)
-            logger.info('搜索关键字：%s' % self.keywords)
-            logger.info('开始时间：%s' % self.startTime)
-            logger.info('结束时间：%s' % self.endTime)
-            logger.info('共%s页，共导出%s条微博' % (totalpage,len(self.df)))
-            logger.info('导出地址：\n%s\n%s' % (csv_path, excel_path))
-        except Exception as e:
-            logger.error('Something wrong with', exc_info=True)
+        self.df_count = len(self.df)
 
+# 输入关键词、日期，分天爬取
 def main():
-    username = '********'
-    password = '********'
+    username = '********' # 输入用户名
+    password = '********' # 输入密码
     ls = LoginSina(username, password)
+    c = ls.get_cookies()
     keywords = input('请输入关键词：')
     startTime = input('输入开始时间(Format:YYYY-mm-dd):')
     endTime = input('输入结束时间(Format:YYYY-mm-dd):')
@@ -197,11 +199,25 @@ def main():
     end_date = datetime.datetime.strptime(endTime, '%Y-%m-%d')
     start_temp = start_date
     end_temp = start_temp
+    r = pandas.DataFrame()
     while end_temp<=end_date:
-        dw = DownloadWeibo(keywords, start_temp.strftime('%Y-%m-%d'), end_temp.strftime('%Y-%m-%d'), saveDir, ls.get_cookies())
+        dw = DownloadWeibo(keywords, start_temp.strftime('%Y-%m-%d'), end_temp.strftime('%Y-%m-%d'), saveDir, c, r)
         dw.get_contents()
+        logger.info('查询结果条数：%d' % dw.count)
+        logger.info('取得结果条数：%d' % dw.df_count)
+        r = dw.df
         start_temp = end_temp+datetime.timedelta(days=1)
         end_temp = start_temp
+    excel_path = saveDir+keywords+startTime.replace('-','')[4:8]+'-'+endTime.replace('-','')[4:8]+'.xlsx'
+    try:
+        r.to_excel(excel_path, index=0)
+        logger.info('搜索关键字：%s' % keywords)
+        logger.info('开始时间：%s' % startTime)
+        logger.info('结束时间：%s' % endTime)
+        logger.info('共导出%s条微博' % len(r))
+        logger.info('导出地址：%s' % excel_path)
+    except:
+        logger.error('Something wrong with', exc_info=True)
 
 if __name__ == '__main__':
     logger = logging.getLogger(__name__)
