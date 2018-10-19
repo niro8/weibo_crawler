@@ -9,8 +9,14 @@ import random
 import logging
 from selenium import webdriver
 
+#chrome_options = webdriver.ChromeOptions()
+#chrome_options.add_argument('headless')
+
+#driver = webdriver.Chrome('D:/chromedriver/chromedriver.exe',chrome_options=chrome_options)
 driver = webdriver.Chrome('D:/chromedriver/chromedriver.exe')
+#driver = webdriver.PhantomJS('D:/phantomjs/bin/phantomjs.exe')
 df = pandas.DataFrame()
+driver.maximize_window()
 
 def LoginWeibo(username, password):
     try:
@@ -23,23 +29,23 @@ def LoginWeibo(username, password):
         driver.find_element_by_xpath('//*[@id="login_form_savestate"]').click()
         time.sleep(1)
         driver.find_element_by_xpath('//*[@id="pl_login_form"]/div/div[3]/div[6]/a').click()
-    except Exception as e:
+    except Exception:
         logger.error('Something wrong with', exc_info=True)
 
 def GetSearchContent(key):
     driver.get("http://s.weibo.com/")
     logger.info('搜索热点主题：%s' % key)
-    driver.find_element_by_xpath("//input[@class='searchInp_form']").send_keys(key)
+    driver.find_element_by_xpath("//input").send_keys(key)
     time.sleep(3)
-    driver.find_element_by_xpath('//*[@id="pl_searchHead"]/div/div/div/div[1]/a').click()
+    driver.find_element_by_xpath('//button').click()
     current_url = driver.current_url.split('&')[0]
-    start_date = datetime.datetime(2018,7,4,0)
-    end_date = datetime.datetime(2018,7,4,23)
+    start_date = datetime.datetime(2018,10,18,0)
+    end_date = datetime.datetime(2018,10,18,23)
     delta_date = datetime.timedelta(hours=23)
     start_stamp = start_date
     end_stamp = start_date + delta_date
     while end_stamp <= end_date:
-        url = current_url + '&typeall=1&suball=1&timescope=custom:' + str(start_stamp.strftime("%Y-%m-%d-%H")) + ':' + str(end_stamp.strftime("%Y-%m-%d-%H")) + '&Refer=g'
+        url = current_url + '&typeall=1&suball=1&timescope=custom:' + str(start_stamp.strftime("%Y-%m-%d")) + ':' + str(end_stamp.strftime("%Y-%m-%d")) + '&Refer=g'
         time.sleep(random.randint(5,10))
         driver.get(url)
         handlePage()
@@ -55,7 +61,7 @@ def handlePage():
             getContent()
             page += 1
             if checkNext():
-                driver.find_element_by_xpath("//a[@class='page next S_txt1 S_line1']").click()
+                driver.find_element_by_xpath('//div[@class="m-page"]/div/a[@class="next"]').click()
             else:
                 logger.info("no Next")
                 break
@@ -73,7 +79,7 @@ def checkContent():
 
 def checkNext():
     try:
-        driver.find_element_by_xpath("//a[@class='page next S_txt1 S_line1']")
+        driver.find_element_by_xpath('//div[@class="m-page"]/div/a[@class="next"]')
         flag = True
     except:
         flag = False
@@ -81,80 +87,65 @@ def checkNext():
 
 def get_datetime(s):
     try:
-        m, d, H, M = re.findall(r'\d+',s)
-        date = datetime.datetime(2018, int(m), int(d), int(H), int(M)).strftime('%Y-%m-%d %H:%M')
-    except:
-        date = s
-    return date
-
-def checkContent():
-    try:
-        driver.find_element_by_xpath("//div[@class='pl_noresult']")
-        flag = False
-    except:
-        flag = True
-    return flag
-
-def checkNext():
-    try:
-        driver.find_element_by_xpath("//a[@class='page next S_txt1 S_line1']")
-        flag = True
-    except:
-        flag = False
-    return flag
-
-def get_datetime(s):
-    try:
-        m, d, H, M = re.findall(r'\d+',s)
-        date = datetime.datetime(2018, int(m), int(d), int(H), int(M)).strftime('%Y-%m-%d %H:%M')
+        today = datetime.datetime.today()
+        if '今天' in s:
+            H, M = re.findall(r'\d+',s)
+            date = datetime.datetime(today.year, today.month, today.day, int(H), int(M)).strftime('%Y-%m-%d %H:%M')
+        elif '年' in s:
+            y, m, d, H, M = re.findall(r'\d+',s)
+            date = datetime.datetime(int(y), int(m), int(d), int(H), int(M)).strftime('%Y-%m-%d %H:%M')                       
+        else:    
+            m, d, H, M = re.findall(r'\d+',s)
+            date = datetime.datetime(today.year, int(m), int(d), int(H), int(M)).strftime('%Y-%m-%d %H:%M')
     except:
         date = s
     return date
 
 def getContent():
-    nodes = driver.find_elements_by_xpath("//div[@class='WB_cardwrap S_bg2 clearfix']")
+    nodes = driver.find_elements_by_xpath('//div[@class="card-wrap"][@action-type="feed_list_item"][@mid]')
     if len(nodes) == 0:
-        time.sleep(random.randint(5,10))
+        time.sleep(random.randint(20,30))
         driver.get(driver.current_url)
         getContent()
-        return
     results = []
     global df
     logger.info('微博数量：%s' % len(nodes))
     for i in range(len(nodes)):
         blog = {}
         try:
-            BZNC = nodes[i].find_element_by_xpath(".//div[@class='feed_content wbcon']/a[@class='W_texta W_fb']").text
+            BZNC = nodes[i].find_element_by_xpath('.//a[@class="name"]').get_attribute('nick-name')
         except:
             BZNC = ''
         blog['博主昵称'] = BZNC
         try:
-            BZZY = nodes[i].find_element_by_xpath(".//div[@class='feed_content wbcon']/a[@class='W_texta W_fb']").get_attribute("href")
+            BZZY = nodes[i].find_element_by_xpath('.//a[@class="name"]').get_attribute("href")
         except:
             BZZY = ''
         blog['博主主页'] = BZZY
         try:
-            WBNR = nodes[i].find_element_by_xpath(".//div[@class='feed_content wbcon']/p[@class='comment_txt']").text
+            WBNR = nodes[i].find_element_by_xpath('.//p[@class="txt"][@node-type="feed_list_content"]').text
+            if len(nodes[i].find_elements_by_xpath('.//p[@class="txt"][@node-type="feed_list_content"]'))>1:
+                WBNR = WBNR + '\n转发：' +nodes[i].find_element_by_xpath('.//div[@node-type="feed_list_forwardContent"]').text
         except:
             WBNR = ''
         blog['微博内容'] = WBNR
         try:
-            FBSJ = nodes[i].find_element_by_xpath(".//div[comment() and @class='feed_from W_textb']/a[@class='W_textb']").text
+            FBSJ = nodes[i].find_element_by_xpath('.//div[@class="content"]/p[@class="from"]/a[1]').text
         except:
             FBSJ = ''
         blog['发布时间'] = get_datetime(FBSJ)
         try:
-            WBDZ = nodes[i].find_element_by_xpath(".//div[comment() and @class='feed_from W_textb']/a[@class='W_textb']").get_attribute("href")
+            WBDZ = nodes[i].find_element_by_xpath('.//div[@class="content"]/p[@class="from"]/a[1]').get_attribute("href")
         except:
             WBDZ = ''
         blog['微博地址'] = WBDZ
         try:
-            WBLY = nodes[i].find_element_by_xpath(".//div[comment() and @class='feed_from W_textb']/a[@rel]").text
+            WBLY = nodes[i].find_element_by_xpath('.//div[@class="content"]/p[@class="from"]/a[2]').text
         except:
             WBLY = ''
         blog['微博来源'] = WBLY
         try:
-            ZF_TEXT = nodes[i].find_element_by_xpath(".//a[@action-type='feed_list_forward']//em").text
+            ZF_TEXT = nodes[i].find_element_by_xpath('.//div[@class="card-act"]/ul/li[2]').text.replace('转发','').strip()
             if ZF_TEXT == '':
                 ZF = 0
             else:
@@ -163,7 +154,7 @@ def getContent():
             ZF = 0
         blog['转发'] = ZF
         try:
-            PL_TEXT = nodes[i].find_element_by_xpath(".//div[@class='feed_action clearfix']//a[@action-type='feed_list_comment']//em").text
+            PL_TEXT = nodes[i].find_element_by_xpath('.//div[@class="card-act"]/ul/li[3]').text.replace('评论','').strip()
             if PL_TEXT == '':
                 PL = 0
             else:
@@ -172,7 +163,7 @@ def getContent():
             PL = 0
         blog['评论'] = PL
         try:
-            ZAN_TEXT = nodes[i].find_element_by_xpath(".//div[@class='feed_action clearfix']//a[@action-type='feed_list_like']//em").text
+            ZAN_TEXT = nodes[i].find_element_by_xpath('.//div[@class="card-act"]/ul/li[4]/a/em').text
             if ZAN_TEXT == '':
                 ZAN = 0
             else:
@@ -183,9 +174,9 @@ def getContent():
 
         results.append(blog)
     df = df.append(results)
-    df.to_excel('C:/Users/Administrator/Desktop/results.xlsx',index=0)
+    df.to_excel('C:/Users/Administrator/Desktop/微博抓取/爬微博1/results/results1018.xlsx',index=0)
     logger.info('已导出微博条数：%s' % len(df))
-    # df.to_csv('C:/Users/Administrator/Desktop/results.csv',index=0,encoding='utf_8_sig')
+    # df.to_csv('C:/Users/Administrator/Desktop/results/results0806.csv',index=0,encoding='utf_8_sig')
 
 if __name__ == '__main__':
     logger = logging.getLogger(__name__)
@@ -200,10 +191,10 @@ if __name__ == '__main__':
     logger.addHandler(handler)
     logger.addHandler(console)
     logger.info('*'*30+'START'+'*'*30)
-    username = '*********'
-    password = '*********'
+    username = 'yinzhiren_ruc@163.com'
+    password = 'w}gRCLF(];DB'
     LoginWeibo(username, password)
-    key = 'p2p'
+    key = '尚德机构'
     GetSearchContent(key)
     time.sleep(10)
     driver.quit()
