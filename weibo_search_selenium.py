@@ -70,7 +70,7 @@ def handlePage():
 # 检查页面是否有内容
 def checkContent():
     try:
-        driver.find_element_by_xpath("//div[@class='pl_noresult']")
+        driver.find_element_by_xpath("//div[@class='card card-no-result s-pt20b40']")
         flag = False
     except:
         flag = True
