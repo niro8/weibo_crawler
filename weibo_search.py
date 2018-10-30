@@ -119,43 +119,47 @@ class DownloadWeibo(object):
     def get_results(self, html):
         results = []
         soup = BeautifulSoup(html, 'html.parser')
-        logger.info('微博数量：%s' % len(soup.select('div[action-type="feed_list_item"]')))
-        for i in soup.select('div[action-type="feed_list_item"]'):
-            blog = {}
-            blog['博主昵称'] = i.select('.name')[0].get('nick-name')
-            blog['博主主页'] = 'https:'+i.select('.name')[0].get('href')
-            if len(i.select('.comment_txt'))>1:
-                # blog['微博内容'] = i.select('.comment_txt')[0].get_text().strip()+'\n转发：'+i.select('.comment_txt')[1].get_text().strip()
-                blog['微博内容'] = i.select('p.txt')[0].get_text().strip()
-            blog['发布时间'] = self.get_datetime(i.select('div[class="content"] p[class="from"] a')[0].get_text())
-            blog['微博地址'] = 'https:'+i.select('div[class="content"] p[class="from"] a')[0].get('href')
-            try:
-                blog['微博来源'] = i.select('div[class="content"] p[class="from"] a')[1].get_text()
-            except:
-                blog['微博来源'] = ''
-            try:
-                sd = i.select('.card-act ul li')
-            except Exception:
-                logger.info('sd not found...')
-                logger.error('Something wrong with', exc_info=True)
-            try:
-                blog['转发'] = 0 if sd[1].text.replace('转发','').strip()=='' else int(sd[1].text.replace('转发','').strip())
-            except:
-                blog['转发'] = 0
-            try:
-                blog['评论'] = 0 if sd[2].text.replace('评论','').strip()=='' else int(sd[2].text.replace('评论','').strip())
-            except:
-                blog['评论'] = 0
-            try:
-                blog['赞'] = 0 if sd[3].select('em')[0].get_text()=='' else int(sd[3].select('em')[0].get_text())
-            except:
-                blog['赞'] = 0
-            results.append(blog)
+        if len(soup.select('.card-no-result'))>0:
+            results = None
+            logger.info('No Results')
+        else:
+            logger.info('微博数量：%s' % len(soup.select('div[action-type="feed_list_item"]')))
+            for i in soup.select('div[action-type="feed_list_item"]'):
+                blog = {}
+                blog['博主昵称'] = i.select('.name')[0].get('nick-name')
+                blog['博主主页'] = 'https:'+i.select('.name')[0].get('href')
+                if len(i.select('.comment_txt'))>1:
+                    # blog['微博内容'] = i.select('.comment_txt')[0].get_text().strip()+'\n转发：'+i.select('.comment_txt')[1].get_text().strip()
+                    blog['微博内容'] = i.select('p.txt')[0].get_text().strip()
+                blog['发布时间'] = self.get_datetime(i.select('div[class="content"] p[class="from"] a')[0].get_text())
+                blog['微博地址'] = 'https:'+i.select('div[class="content"] p[class="from"] a')[0].get('href')
+                try:
+                    blog['微博来源'] = i.select('div[class="content"] p[class="from"] a')[1].get_text()
+                except:
+                    blog['微博来源'] = ''
+                try:
+                    sd = i.select('.card-act ul li')
+                except Exception:
+                    logger.info('sd not found...')
+                    logger.error('Something wrong with', exc_info=True)
+                try:
+                    blog['转发'] = 0 if sd[1].text.replace('转发','').strip()=='' else int(sd[1].text.replace('转发','').strip())
+                except:
+                    blog['转发'] = 0
+                try:
+                    blog['评论'] = 0 if sd[2].text.replace('评论','').strip()=='' else int(sd[2].text.replace('评论','').strip())
+                except:
+                    blog['评论'] = 0
+                try:
+                    blog['赞'] = 0 if sd[3].select('em')[0].get_text()=='' else int(sd[3].select('em')[0].get_text())
+                except:
+                    blog['赞'] = 0
+                results.append(blog)
         return results
 
     def get_totalpage(self):
         soup = BeautifulSoup(self.get_html(1), 'html.parser')
-        self.count = int(re.search(r'\d+',soup.select('.result')[0].text).group(0))
+        # self.count = int(re.search(r'\d+',soup.select('.result')[0].text).group(0))
         if len(soup.select('.card-no-result'))>0:
             totalpage = 0
         else:
@@ -174,7 +178,8 @@ class DownloadWeibo(object):
                     time.sleep(random.randint(5,10))
                     html_page = self.get_html(i)
                     results = self.get_results(html_page)
-                    self.df = self.df.append(results)
+                    if results != None:
+                        self.df = self.df.append(results)
                 except:
                     logger.error('Something wrong with', exc_info=True)
                     time.sleep(120)
@@ -203,7 +208,7 @@ def main():
     while end_temp<=end_date:
         dw = DownloadWeibo(keywords, start_temp.strftime('%Y-%m-%d'), end_temp.strftime('%Y-%m-%d'), saveDir, c, r)
         dw.get_contents()
-        logger.info('查询结果条数：%d' % dw.count)
+        # logger.info('查询结果条数：%d' % dw.count)
         logger.info('取得结果条数：%d' % dw.df_count)
         r = dw.df
         start_temp = end_temp+datetime.timedelta(days=1)
