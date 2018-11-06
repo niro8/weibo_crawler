@@ -9,9 +9,14 @@ import random
 import logging
 from selenium import webdriver
 
-driver = webdriver.Chrome('D:/chromedriver/chromedriver.exe')
+chrome_options = webdriver.ChromeOptions()
+chrome_options.add_argument('--headless')
+chrome_options.add_argument('--disable-gpu')
+chrome_options.add_argument('window-size=1200,1100')
+driver = webdriver.Chrome(chrome_options=chrome_options,executable_path='D:/chromedriver/chromedriver.exe')
+# driver = webdriver.Chrome('D:/chromedriver/chromedriver.exe')
 df = pandas.DataFrame()
-driver.maximize_window()
+# driver.maximize_window()
 
 # 登录
 def LoginWeibo(username, password):
